@@ -29,7 +29,7 @@ const { toggleMenu, toggleDarkMode, isDarkTheme } = useLayout();
             />
           </g>
         </svg>
-        <span>pdfstore</span>
+        <span>DocLibrary</span>
       </router-link>
     </div>
 

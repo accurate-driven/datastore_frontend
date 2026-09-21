@@ -42,7 +42,10 @@ export const api = {
       body: JSON.stringify({ document_ids: ids }),
     });
     if (!res.ok) throw new Error(await res.text());
-    return res.blob();
+    const blob = await res.blob();
+    const cd = res.headers.get("Content-Disposition") || "";
+    const m = cd.match(/filename="?([^"]+)/);
+    return { blob, filename: m?.[1] || "export.zip" };
   },
   exports: () => req("/api/exports"),
   patchTag: (id, body) =>

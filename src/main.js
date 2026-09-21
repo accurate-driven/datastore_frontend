@@ -1,23 +1,31 @@
-import { createApp } from "vue";
 import { createPinia } from "pinia";
-import { createRouter, createWebHistory } from "vue-router";
+import { createApp } from "vue";
 import App from "./App.vue";
-import Library from "./views/Library.vue";
-import Upload from "./views/Upload.vue";
-import Document from "./views/Document.vue";
-import Exports from "./views/Exports.vue";
-import Categories from "./views/Categories.vue";
-import "./styles.css";
+import router from "./router";
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes: [
-    { path: "/", component: Library },
-    { path: "/upload", component: Upload },
-    { path: "/documents/:id", component: Document },
-    { path: "/exports", component: Exports },
-    { path: "/categories", component: Categories },
-  ],
+import Aura from "@primeuix/themes/aura";
+import PrimeVue from "primevue/config";
+import ConfirmationService from "primevue/confirmationservice";
+import StyleClass from "primevue/styleclass";
+import ToastService from "primevue/toastservice";
+
+import "@/assets/styles.scss";
+import "@/assets/tailwind.css";
+
+const app = createApp(App);
+
+app.use(createPinia());
+app.use(router);
+app.use(PrimeVue, {
+  theme: {
+    preset: Aura,
+    options: {
+      darkModeSelector: ".app-dark",
+    },
+  },
 });
+app.use(ToastService);
+app.use(ConfirmationService);
+app.directive("styleclass", StyleClass);
 
-createApp(App).use(createPinia()).use(router).mount("#app");
+app.mount("#app");

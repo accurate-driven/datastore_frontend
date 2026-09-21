@@ -1,64 +1,94 @@
 <template>
   <div v-if="doc">
-    <div class="row" style="justify-content: space-between">
-      <div>
-        <h2>{{ doc.title }}</h2>
-        <p class="muted">{{ doc.filename }} · {{ doc.page_count || "—" }} pages · {{ doc.file_ext }}</p>
-      </div>
-      <div class="row">
-        <a :href="api.downloadUrl(doc.id)"><button>Download</button></a>
+    <div class="card">
+      <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div>
+          <div class="font-semibold text-xl mb-2">{{ doc.title }}</div>
+          <p class="text-muted-color m-0">
+            {{ doc.filename }} · {{ doc.page_count || "—" }} pages · {{ doc.file_ext }}
+          </p>
+        </div>
+        <Button as="a" :href="api.downloadUrl(doc.id)" label="Download" icon="pi pi-download" />
       </div>
     </div>
-    <h3>Category (canonical tree)</h3>
-    <div class="row">
-      <select v-model="tagId">
-        <option v-for="t in flat" :key="t.id" :value="t.id">{{ t.path }}</option>
-      </select>
-      <button @click="saveCat">Save (manual)</button>
-      <button @click="reclass">Reclassify</button>
-      <span class="pill">{{ doc.source }}</span>
-    </div>
-    <p class="muted">Changing the path is kept as manual. Reclassify runs Ollama again.</p>
-    <div class="split">
-      <div>
-        <h3>Original names (zip, not category)</h3>
-        <p v-for="a in filenames" :key="a">{{ a }}</p>
-        <h3>Original zip paths</h3>
-        <p v-for="a in paths" :key="a">{{ a }}</p>
+
+    <div class="card">
+      <div class="font-semibold text-xl mb-2">Category (canonical tree)</div>
+      <p class="text-muted-color mb-4">Changing the path is kept as manual. Reclassify runs Ollama again.</p>
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="flex flex-col gap-2">
+          <label class="font-medium" for="cat">Category path</label>
+          <Select
+            inputId="cat"
+            v-model="tagId"
+            :options="flat"
+            optionLabel="path"
+            optionValue="id"
+            class="w-full sm:w-96"
+          />
+        </div>
+        <Button label="Save (manual)" icon="pi pi-save" @click="saveCat" />
+        <Button label="Reclassify" icon="pi pi-refresh" severity="secondary" @click="reclass" />
+        <Tag :value="doc.source || '—'" :severity="sourceSeverity(doc.source)" />
       </div>
-      <div>
-        <h3>Exported as</h3>
-        <p v-for="e in doc.exports || []" :key="e.job_id + e.exported_at">
-          {{ e.exported_at?.slice(0, 16) }} · {{ e.path_in_zip }}
-        </p>
+      <Message v-if="error" severity="error" class="mt-4" :closable="false">{{ error }}</Message>
+    </div>
+
+    <div class="grid grid-cols-12 gap-4">
+      <div class="col-span-12 md:col-span-6">
+        <div class="card">
+          <div class="font-semibold text-xl mb-4">Original names (zip, not category)</div>
+          <ul v-if="filenames.length" class="list-none p-0 m-0 flex flex-col gap-2">
+            <li v-for="a in filenames" :key="a" class="text-muted-color">{{ a }}</li>
+          </ul>
+          <p v-else class="text-muted-color m-0">None</p>
+          <div class="font-semibold text-xl mt-6 mb-4">Original zip paths</div>
+          <ul v-if="paths.length" class="list-none p-0 m-0 flex flex-col gap-2">
+            <li v-for="a in paths" :key="a" class="text-muted-color">{{ a }}</li>
+          </ul>
+          <p v-else class="text-muted-color m-0">None</p>
+        </div>
+      </div>
+      <div class="col-span-12 md:col-span-6">
+        <div class="card">
+          <div class="font-semibold text-xl mb-4">Exported as</div>
+          <DataTable :value="doc.exports || []" emptyMessage="Not exported yet." stripedRows>
+            <Column header="When">
+              <template #body="{ data }">
+                {{ fmtDate(data.exported_at) }}
+              </template>
+            </Column>
+            <Column field="path_in_zip" header="Path in zip" />
+          </DataTable>
+        </div>
       </div>
     </div>
   </div>
-  <p v-else-if="error" class="warn">{{ error }}</p>
+  <Message v-else-if="error" severity="error" :closable="false">{{ error }}</Message>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { api } from "@/api";
+import { flattenTags } from "@/categoryTree";
+import { fmtDate, sourceSeverity } from "@/format";
+import { useToast } from "primevue/usetoast";
+import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { api } from "../api";
 
 const route = useRoute();
+const toast = useToast();
 const doc = ref(null);
 const tree = ref([]);
-const tagId = ref("");
+const tagId = ref(null);
 const error = ref("");
 
-function flatten(nodes, prefix = "", acc = []) {
-  for (const n of nodes) {
-    const path = prefix ? `${prefix} / ${n.name}` : n.name;
-    acc.push({ id: n.id, path });
-    flatten(n.children || [], path, acc);
-  }
-  return acc;
-}
-const flat = computed(() => flatten(tree.value));
-const filenames = computed(() => (doc.value?.aliases || []).filter((a) => a.kind === "filename").map((a) => a.value));
-const paths = computed(() => (doc.value?.aliases || []).filter((a) => a.kind === "zip_path").map((a) => a.value));
+const flat = computed(() => flattenTags(tree.value));
+const filenames = computed(() =>
+  (doc.value?.aliases || []).filter((a) => a.kind === "filename").map((a) => a.value),
+);
+const paths = computed(() =>
+  (doc.value?.aliases || []).filter((a) => a.kind === "zip_path").map((a) => a.value),
+);
 
 async function load() {
   error.value = "";
@@ -66,17 +96,35 @@ async function load() {
     const t = await api.tree();
     tree.value = t.tree || [];
     doc.value = await api.document(route.params.id);
-    tagId.value = doc.value.category_id || "";
+    tagId.value = doc.value.category_id || null;
   } catch (e) {
     error.value = e.message;
+    doc.value = null;
   }
 }
+
 async function saveCat() {
-  doc.value = await api.setCategory(doc.value.id, tagId.value);
+  error.value = "";
+  try {
+    doc.value = await api.setCategory(doc.value.id, tagId.value);
+    toast.add({ severity: "success", summary: "Saved", detail: "Category set as manual", life: 3000 });
+  } catch (e) {
+    error.value = e.message;
+    toast.add({ severity: "error", summary: "Save failed", detail: e.message, life: 6000 });
+  }
 }
+
 async function reclass() {
-  doc.value = await api.reclassify(doc.value.id);
-  tagId.value = doc.value.category_id || "";
+  error.value = "";
+  try {
+    doc.value = await api.reclassify(doc.value.id);
+    tagId.value = doc.value.category_id || null;
+    toast.add({ severity: "success", summary: "Reclassified", detail: doc.value.category_path || "Uncategorized", life: 3000 });
+  } catch (e) {
+    error.value = e.message;
+    toast.add({ severity: "error", summary: "Reclassify failed", detail: e.message, life: 6000 });
+  }
 }
-onMounted(load);
+
+watch(() => route.params.id, load, { immediate: true });
 </script>

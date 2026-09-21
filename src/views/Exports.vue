@@ -1,41 +1,51 @@
 <template>
-  <div>
-    <h2>Export history</h2>
-    <p class="muted">Each zip uses the canonical tree, not original zip folders.</p>
-    <p v-if="error" class="warn">{{ error }}</p>
-    <table>
-      <thead>
-        <tr>
-          <th>When</th>
-          <th>Zip</th>
-          <th>Files</th>
-          <th>Paths in zip</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="e in rows" :key="e.id">
-          <td>{{ e.created_at?.slice(0, 16).replace("T", " ") }}</td>
-          <td>{{ e.zip_filename }}</td>
-          <td>{{ e.item_count }}</td>
-          <td>{{ (e.paths || []).join(", ") }}</td>
-        </tr>
-      </tbody>
-    </table>
+  <div class="card">
+    <div class="font-semibold text-xl mb-2">Export history</div>
+    <p class="text-muted-color mb-4">Each zip uses the canonical tree, not original zip folders.</p>
+    <Message v-if="error" severity="error" class="mb-4" :closable="false">{{ error }}</Message>
+    <DataTable
+      :value="rows"
+      dataKey="id"
+      :loading="loading"
+      stripedRows
+      paginator
+      :rows="20"
+      emptyMessage="No exports yet."
+    >
+      <Column header="When" sortable field="created_at">
+        <template #body="{ data }">
+          {{ fmtDate(data.created_at) }}
+        </template>
+      </Column>
+      <Column field="zip_filename" header="Zip" sortable />
+      <Column field="item_count" header="Files" sortable style="width: 8rem" />
+      <Column header="Paths in zip">
+        <template #body="{ data }">
+          {{ (data.paths || []).join(", ") }}
+        </template>
+      </Column>
+    </DataTable>
   </div>
 </template>
 
 <script setup>
+import { api } from "@/api";
+import { fmtDate } from "@/format";
 import { onMounted, ref } from "vue";
-import { api } from "../api";
 
 const rows = ref([]);
 const error = ref("");
+const loading = ref(false);
+
 onMounted(async () => {
+  loading.value = true;
   try {
     const data = await api.exports();
     rows.value = data.exports || [];
   } catch (e) {
     error.value = e.message;
+  } finally {
+    loading.value = false;
   }
 });
 </script>

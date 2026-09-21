@@ -1,90 +1,136 @@
 <template>
   <div>
-    <h2>Category tree</h2>
-    <p class="muted">Built from PDF content. Zip folders do not appear here.</p>
-    <p v-if="error" class="warn">{{ error }}</p>
-    <table>
-      <thead>
-        <tr>
-          <th>Tree</th>
-          <th>Documents</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="row in rows" :key="row.id">
-          <td>{{ row.indent }}{{ row.name }}</td>
-          <td>{{ row.document_count }}</td>
-        </tr>
-      </tbody>
-    </table>
-    <div class="row" style="margin-top: 16px">
-      <label class="muted">Rename node<br />
-        <select v-model="editId">
-          <option v-for="r in rows" :key="r.id" :value="r.id">{{ r.path }}</option>
-        </select>
-      </label>
-      <input v-model="newName" placeholder="new name" />
-      <button @click="rename">Rename</button>
-      <button @click="reclass">Reclassify Uncategorized</button>
+    <div class="card">
+      <div class="font-semibold text-xl mb-2">Category tree</div>
+      <p class="text-muted-color mb-4">Built from PDF content. Zip folders do not appear here.</p>
+      <Message v-if="error" severity="error" class="mb-4" :closable="false">{{ error }}</Message>
+      <TreeTable
+        :value="tableNodes"
+        v-model:selectionKeys="selectionKeys"
+        v-model:expandedKeys="expandedKeys"
+        selectionMode="single"
+        class="w-full"
+      >
+        <Column field="name" header="Category" :expander="true" />
+        <Column field="document_count" header="Documents" style="width: 10rem" />
+      </TreeTable>
     </div>
-    <div class="row">
-      <label class="muted">Merge source into target<br />
-        <select v-model="src"><option v-for="r in rows" :key="'s'+r.id" :value="r.id">{{ r.path }}</option></select>
-      </label>
-      <select v-model="dst"><option v-for="r in rows" :key="'d'+r.id" :value="r.id">{{ r.path }}</option></select>
-      <button @click="merge">Merge</button>
+
+    <div class="grid grid-cols-12 gap-4">
+      <div class="col-span-12 lg:col-span-6">
+        <div class="card">
+          <div class="font-semibold text-xl mb-4">Rename node</div>
+          <div class="flex flex-col gap-3">
+            <Select v-model="editId" :options="flat" optionLabel="path" optionValue="id" placeholder="Select a node" />
+            <InputText v-model="newName" placeholder="New name" />
+            <Button label="Rename" icon="pi pi-pencil" :disabled="!editId || !newName" @click="rename" />
+          </div>
+        </div>
+      </div>
+      <div class="col-span-12 lg:col-span-6">
+        <div class="card">
+          <div class="font-semibold text-xl mb-4">Merge source into target</div>
+          <div class="flex flex-col gap-3">
+            <Select v-model="src" :options="flat" optionLabel="path" optionValue="id" placeholder="Source" />
+            <Select v-model="dst" :options="flat" optionLabel="path" optionValue="id" placeholder="Target" />
+            <div class="flex flex-wrap gap-2">
+              <Button label="Merge" icon="pi pi-sitemap" severity="warn" :disabled="!src || !dst || src === dst" @click="merge" />
+              <Button label="Reclassify Uncategorized" icon="pi pi-refresh" severity="secondary" @click="reclass" />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import { api } from "../api";
+import { api } from "@/api";
+import { collectKeys, flattenTags, selectedKey, toTreeTable } from "@/categoryTree";
+import { useConfirm } from "primevue/useconfirm";
+import { useToast } from "primevue/usetoast";
+import { computed, onMounted, ref, watch } from "vue";
 
+const toast = useToast();
+const confirm = useConfirm();
 const tree = ref([]);
 const error = ref("");
-const editId = ref("");
+const editId = ref(null);
 const newName = ref("");
-const src = ref("");
-const dst = ref("");
+const src = ref(null);
+const dst = ref(null);
+const selectionKeys = ref({});
+const expandedKeys = ref({});
 
-function walk(nodes, depth, prefix, acc) {
-  for (const n of nodes) {
-    const path = prefix ? `${prefix} / ${n.name}` : n.name;
-    acc.push({
-      id: n.id,
-      name: n.name,
-      path,
-      indent: "  ".repeat(depth),
-      document_count: n.document_count,
-    });
-    walk(n.children || [], depth + 1, path, acc);
-  }
-  return acc;
-}
-const rows = computed(() => walk(tree.value, 0, "", []));
+const tableNodes = computed(() => toTreeTable(tree.value));
+const flat = computed(() => flattenTags(tree.value));
+
+watch(selectionKeys, (keys) => {
+  const id = selectedKey(keys);
+  if (id) editId.value = id;
+});
 
 async function load() {
   const data = await api.tree();
   tree.value = data.tree || [];
-  if (rows.value[0]) {
-    editId.value = rows.value[0].id;
-    src.value = rows.value[0].id;
-    dst.value = rows.value[0].id;
+  expandedKeys.value = collectKeys(tableNodes.value);
+  if (flat.value[0]) {
+    editId.value = editId.value || flat.value[0].id;
+    src.value = src.value || flat.value[0].id;
+    dst.value = dst.value || flat.value[0].id;
   }
 }
+
 async function rename() {
-  await api.patchTag(editId.value, { name: newName.value });
-  await load();
+  error.value = "";
+  try {
+    await api.patchTag(editId.value, { name: newName.value });
+    newName.value = "";
+    toast.add({ severity: "success", summary: "Renamed", life: 3000 });
+    await load();
+  } catch (e) {
+    error.value = e.message;
+    toast.add({ severity: "error", summary: "Rename failed", detail: e.message, life: 6000 });
+  }
 }
-async function merge() {
-  await api.mergeTags(src.value, dst.value);
-  await load();
+
+function merge() {
+  confirm.require({
+    header: "Merge categories",
+    message: "Merge source into target? The source node is deleted and its papers move to the target.",
+    icon: "pi pi-exclamation-triangle",
+    acceptClass: "p-button-warning",
+    accept: async () => {
+      error.value = "";
+      try {
+        await api.mergeTags(src.value, dst.value);
+        toast.add({ severity: "success", summary: "Merged", life: 3000 });
+        await load();
+      } catch (e) {
+        error.value = e.message;
+        toast.add({ severity: "error", summary: "Merge failed", detail: e.message, life: 6000 });
+      }
+    },
+  });
 }
+
 async function reclass() {
-  await api.reclassifyUncat();
-  await load();
+  error.value = "";
+  try {
+    const data = await api.reclassifyUncat();
+    toast.add({
+      severity: "success",
+      summary: "Reclassify finished",
+      detail: `${data.reclassified ?? 0} papers`,
+      life: 4000,
+    });
+    await load();
+  } catch (e) {
+    error.value = e.message;
+    toast.add({ severity: "error", summary: "Reclassify failed", detail: e.message, life: 6000 });
+  }
 }
+
 onMounted(async () => {
   try {
     await load();

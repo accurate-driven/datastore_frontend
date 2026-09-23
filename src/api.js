@@ -37,11 +37,32 @@ export const api = {
   },
   importJobs: () => req("/api/import"),
   importJob: (id) => req(`/api/import/${id}`),
-  exportZip: async (ids) => {
+  importSources: () => req("/api/import-sources"),
+  exportLanguages: () => req("/api/export-languages"),
+  addExportLanguage: (name) =>
+    req("/api/export-languages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }),
+  deleteExportLanguage: (id) => req(`/api/export-languages/${id}`, { method: "DELETE" }),
+  setTranslation: (tagId, languageId, name) =>
+    req(`/api/categories/${tagId}/translation`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language_id: languageId, name }),
+    }),
+  exportPreview: (body) =>
+    req("/api/export/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  exportZip: async (body) => {
     const res = await fetch(`${BASE}/api/export`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ document_ids: ids }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(await res.text());
     const blob = await res.blob();

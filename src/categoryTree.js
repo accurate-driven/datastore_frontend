@@ -15,6 +15,7 @@ export function toTreeTable(nodes) {
       id: n.id,
       name: n.name,
       document_count: n.document_count,
+      translations: n.translations || {},
     },
     children: n.children?.length ? toTreeTable(n.children) : undefined,
   }));
@@ -28,6 +29,7 @@ export function flattenTags(nodes, prefix = "", acc = []) {
       name: n.name,
       path,
       document_count: n.document_count,
+      translations: n.translations || {},
     });
     flattenTags(n.children, path, acc);
   }

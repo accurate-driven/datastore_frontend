@@ -19,6 +19,7 @@
       </Column>
       <Column field="zip_filename" header="Zip" sortable />
       <Column field="item_count" header="Files" sortable style="width: 8rem" />
+      <Column field="note" header="Strategy" />
       <Column header="Paths in zip">
         <template #body="{ data }">
           {{ (data.paths || []).join(", ") }}

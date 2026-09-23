@@ -30,11 +30,13 @@ export const api = {
       body: JSON.stringify({ tag_id: tagId }),
     }),
   reclassify: (id) => req(`/api/documents/${id}/reclassify`, { method: "POST" }),
-  ingest: (file) => {
+  importZip: (file) => {
     const fd = new FormData();
     fd.append("file", file);
-    return req("/api/ingest", { method: "POST", body: fd });
+    return req("/api/import", { method: "POST", body: fd });
   },
+  importJobs: () => req("/api/import"),
+  importJob: (id) => req(`/api/import/${id}`),
   exportZip: async (ids) => {
     const res = await fetch(`${BASE}/api/export`, {
       method: "POST",

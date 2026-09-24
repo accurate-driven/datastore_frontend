@@ -1,3 +1,9 @@
+export function lastCategory(path) {
+  if (!path) return "—";
+  const parts = String(path).split(" / ");
+  return parts[parts.length - 1] || "—";
+}
+
 export function fmtDate(iso) {
   if (!iso) return "—";
   return iso.slice(0, 16).replace("T", " ");

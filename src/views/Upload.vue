@@ -3,30 +3,62 @@
     <div class="card">
       <div class="font-semibold text-xl mb-2">Upload</div>
       <p class="text-muted-color mb-4">
-        Drop a zip here. Folders inside are stored as original paths, not categories.
+        Drop zip files here. Folders inside are stored as original paths, not categories. Extra files wait in
+        the queue until the current import finishes.
       </p>
-      <FileUpload
-        ref="uploader"
-        name="file"
-        accept=".zip,application/zip,application/x-zip-compressed"
-        :maxFileSize="2147483648"
-        :customUpload="true"
-        :auto="true"
-        :multiple="false"
-        @uploader="onUploader"
-      >
-        <template #empty>
-          <div class="flex flex-col items-center justify-center py-8">
-            <i class="pi pi-cloud-upload text-4xl text-muted-color mb-3" />
-            <span class="text-muted-color">Drag a zip here, or choose a file.</span>
+      <div @click="onZoneClick">
+        <FileUpload
+          ref="uploader"
+          name="file"
+          accept=".zip,application/zip,application/x-zip-compressed"
+          :maxFileSize="2147483648"
+          :customUpload="true"
+          :auto="true"
+          :multiple="true"
+          :showUploadButton="false"
+          :showCancelButton="false"
+          @uploader="onUploader"
+        >
+          <template #header />
+          <template #content="{ messages }">
+            <Message v-for="msg of messages || []" :key="msg" severity="error" :closable="false">{{ msg }}</Message>
+          </template>
+          <template #empty>
+            <div
+              class="drop-target flex flex-col items-center justify-center py-8"
+              role="button"
+              tabindex="0"
+              @keydown.enter.prevent="openPicker"
+              @keydown.space.prevent="openPicker"
+            >
+              <i class="pi pi-cloud-upload text-4xl text-muted-color mb-3" />
+              <span class="text-muted-color">Drag zip files here, or click to choose.</span>
+            </div>
+          </template>
+        </FileUpload>
+      </div>
+      <div v-if="sending.length || activeJobs.length" class="flex flex-col gap-3 mt-4">
+        <div v-for="item in sending" :key="item.id" class="flex items-center justify-start gap-3">
+          <ProgressSpinner class="shrink-0" style="width: 2rem; height: 2rem; margin: 0" strokeWidth="4" />
+          <div class="min-w-0">
+            <div class="font-medium truncate">{{ item.name }}</div>
+            <span class="text-muted-color">Uploading…</span>
           </div>
-        </template>
-      </FileUpload>
-      <div v-if="activeJob" class="flex items-center justify-start gap-3 mt-4">
-        <ProgressSpinner class="shrink-0" style="width: 2rem; height: 2rem; margin: 0" strokeWidth="4" />
-        <div class="min-w-0">
-          <div class="font-medium truncate">{{ activeJob.zip_filename }}</div>
-          <span class="text-muted-color">{{ activeJob.status === "queued" ? "Waiting for the current import to finish." : "Importing… each new file is embedded once." }}</span>
+        </div>
+        <div v-for="job in activeJobs" :key="job.id" class="flex items-center justify-start gap-3">
+          <ProgressSpinner
+            v-if="job.status === 'running'"
+            class="shrink-0"
+            style="width: 2rem; height: 2rem; margin: 0"
+            strokeWidth="4"
+          />
+          <i v-else class="pi pi-clock shrink-0 text-xl text-muted-color" />
+          <div class="min-w-0">
+            <div class="font-medium truncate">{{ job.zip_filename }}</div>
+            <span class="text-muted-color">{{
+              job.status === "queued" ? "Queued. Waiting for the current import to finish." : "Importing… each new file is embedded once."
+            }}</span>
+          </div>
         </div>
       </div>
       <Message v-if="error" severity="error" class="mt-4" :closable="false">{{ error }}</Message>
@@ -68,6 +100,7 @@
     <Dialog
       v-model:visible="detailOpen"
       modal
+      class="upload-detail-dialog"
       :header="detail?.zip_filename || 'Upload'"
       :style="{ width: 'min(72rem, 96vw)' }"
     >
@@ -88,7 +121,7 @@
         stripedRows
         paginator
         :rows="20"
-        responsiveLayout="scroll"
+        scrollable
         emptyMessage="No files yet."
       >
         <Column field="zip_path" header="Original zip path (not category)" />
@@ -105,9 +138,9 @@
               :to="`/documents/${data.document_id}`"
               class="text-primary font-medium hover:underline"
             >
-              {{ data.category_path || "—" }}
+              {{ lastCategory(data.category_path) }}
             </router-link>
-            <span v-else>{{ data.category_path || data.detail || "—" }}</span>
+            <span v-else>{{ data.category_path ? lastCategory(data.category_path) : data.detail || "—" }}</span>
           </template>
         </Column>
       </DataTable>
@@ -117,13 +150,14 @@
 
 <script setup>
 import { api } from "@/api";
-import { fmtDate, outcomeSeverity } from "@/format";
+import { fmtDate, lastCategory, outcomeSeverity } from "@/format";
 import { useToast } from "primevue/usetoast";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 
 const toast = useToast();
 const uploader = ref(null);
 const jobs = ref([]);
+const sending = ref([]);
 const sortField = ref("started_at");
 const sortOrder = ref(-1);
 const error = ref("");
@@ -134,8 +168,14 @@ const seenStatus = new Map();
 let stopped = false;
 let polling = false;
 
-const activeJob = computed(
-  () => jobs.value.find((job) => job.status === "running") || jobs.value.find((job) => job.status === "queued") || null,
+const activeJobs = computed(() =>
+  jobs.value
+    .filter((job) => stillActive(job.status))
+    .slice()
+    .sort((a, b) => {
+      if (a.status !== b.status) return a.status === "running" ? -1 : 1;
+      return String(a.started_at).localeCompare(String(b.started_at));
+    }),
 );
 
 function sleep(ms) {
@@ -213,19 +253,39 @@ async function onRowClick(event) {
   }
 }
 
+function openPicker() {
+  uploader.value?.choose();
+}
+
+function onZoneClick(event) {
+  if (!event.target.closest(".p-fileupload-content")) return;
+  if (event.target.closest("button, a, input")) return;
+  openPicker();
+}
+
 async function onUploader(event) {
-  const file = event.files?.[0];
-  if (!file) return;
+  const files = [...(event.files || [])];
+  uploader.value?.clear();
+  if (!files.length) return;
   error.value = "";
-  try {
-    await api.importZip(file);
-    uploader.value?.clear();
-    const active = await refresh({ notify: false });
-    if (active) await poll();
-  } catch (e) {
-    error.value = e.message;
-    toast.add({ severity: "error", summary: "Import failed", detail: e.message, life: 8000 });
+  for (const file of files) {
+    const id = crypto.randomUUID();
+    sending.value = [...sending.value, { id, name: file.name }];
+    try {
+      await api.importZip(file);
+    } catch (e) {
+      error.value = e.message;
+      toast.add({ severity: "error", summary: "Import failed", detail: e.message, life: 8000 });
+    } finally {
+      sending.value = sending.value.filter((item) => item.id !== id);
+    }
+    try {
+      await refresh({ notify: false });
+    } catch (e) {
+      error.value = e.message;
+    }
   }
+  if (jobs.value.some((job) => stillActive(job.status))) await poll();
 }
 
 onMounted(async () => {
@@ -243,21 +303,41 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-:deep(.p-fileupload-file-thumbnail) {
+:deep(.p-fileupload-header) {
   display: none;
 }
 
-:deep(.p-fileupload-file)::before {
-  content: "\e958";
-  font-family: "primeicons";
-  font-size: 1.75rem;
-  line-height: 1;
-  width: 2rem;
-  flex-shrink: 0;
-  color: var(--p-text-muted-color);
+:deep(.p-fileupload-content) {
+  cursor: pointer;
 }
 
 :deep(.upload-log .p-datatable-tbody > tr) {
   cursor: pointer;
+}
+</style>
+
+<style>
+.upload-detail-dialog {
+  max-width: 96vw;
+  overflow: hidden;
+}
+
+.upload-detail-dialog .p-dialog-content {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.upload-detail-dialog .p-datatable {
+  min-width: 0;
+}
+
+.upload-detail-dialog .p-datatable-table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.upload-detail-dialog .p-datatable-thead > tr > th,
+.upload-detail-dialog .p-datatable-tbody > tr > td {
+  white-space: nowrap;
 }
 </style>

@@ -122,7 +122,11 @@
               </template>
             </Column>
             <Column field="filename" header="Filename" sortable />
-            <Column field="category_path" header="Category path" sortable />
+            <Column field="category_path" header="Category" sortable>
+              <template #body="{ data }">
+                {{ lastCategory(data.category_path) }}
+              </template>
+            </Column>
             <Column field="source" header="Source" style="width: 8rem">
               <template #body="{ data }">
                 <Tag :value="data.source || '—'" :severity="sourceSeverity(data.source)" />
@@ -142,7 +146,7 @@
 
 <script setup>
 import { collectKeys, toPrimeTree } from "@/categoryTree";
-import { downloadBlob, fmtDate, sourceSeverity } from "@/format";
+import { downloadBlob, fmtDate, lastCategory, sourceSeverity } from "@/format";
 import { api } from "@/api";
 import { useToast } from "primevue/usetoast";
 import { computed, onMounted, ref, watch } from "vue";

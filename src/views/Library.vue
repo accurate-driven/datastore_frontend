@@ -145,7 +145,7 @@
 </template>
 
 <script setup>
-import { collectKeys, toPrimeTree } from "@/categoryTree";
+import { toPrimeTree } from "@/categoryTree";
 import { downloadBlob, fmtDate, lastCategory, sourceSeverity } from "@/format";
 import { api } from "@/api";
 import { useToast } from "primevue/usetoast";
@@ -190,7 +190,7 @@ const treeNodes = computed(() => [
 async function loadTree() {
   const data = await api.tree();
   tree.value = data.tree || [];
-  expandedKeys.value = { all: true, ...collectKeys(toPrimeTree(tree.value)) };
+  expandedKeys.value = { all: true };
 }
 
 async function loadDocs() {

@@ -89,7 +89,7 @@
 
 <script setup>
 import { api } from "@/api";
-import { collectKeys, flattenTags, selectedKey, toTreeTable } from "@/categoryTree";
+import { flattenTags, selectedKey, toTreeTable } from "@/categoryTree";
 import { useConfirm } from "primevue/useconfirm";
 import { useToast } from "primevue/usetoast";
 import { computed, onMounted, ref, watch } from "vue";
@@ -135,7 +135,7 @@ async function loadLanguages() {
 async function load() {
   const data = await api.tree();
   tree.value = data.tree || [];
-  expandedKeys.value = collectKeys(tableNodes.value);
+  expandedKeys.value = {};
   if (flat.value[0]) {
     editId.value = editId.value || flat.value[0].id;
     src.value = src.value || flat.value[0].id;

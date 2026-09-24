@@ -36,14 +36,6 @@ export function flattenTags(nodes, prefix = "", acc = []) {
   return acc;
 }
 
-export function collectKeys(nodes, acc = {}) {
-  for (const n of nodes || []) {
-    acc[n.key] = true;
-    collectKeys(n.children, acc);
-  }
-  return acc;
-}
-
 export function selectedKey(keys) {
   return Object.keys(keys || {}).find((k) => keys[k]) || null;
 }

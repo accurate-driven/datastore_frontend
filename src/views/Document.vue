@@ -14,7 +14,7 @@
 
     <div class="card">
       <div class="font-semibold text-xl mb-2">Category (canonical tree)</div>
-      <p class="text-muted-color mb-4">Changing the path is kept as manual. Reclassify runs Ollama again.</p>
+      <p class="text-muted-color mb-4">Changing the path is kept as manual. Reclassify embeds the file again.</p>
       <div class="flex flex-wrap items-end gap-3">
         <div class="flex flex-col gap-2">
           <label class="font-medium" for="cat">Category path</label>

@@ -35,6 +35,8 @@ export default defineConfig({
       "/api": {
         target: process.env.VITE_DEV_API || "http://192.168.136.129:8000",
         changeOrigin: true,
+        timeout: 600000,
+        proxyTimeout: 600000,
       },
     },
   },

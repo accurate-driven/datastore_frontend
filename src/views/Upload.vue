@@ -11,7 +11,7 @@
           ref="uploader"
           name="file"
           accept=".zip,application/zip,application/x-zip-compressed"
-          :maxFileSize="2147483648"
+          :maxFileSize="3221225472"
           :customUpload="true"
           :auto="true"
           :multiple="true"

@@ -62,15 +62,14 @@
         </div>
         <div class="flex flex-col gap-2">
           <label for="export-language">Second language</label>
-          <Select
-            v-model="languageId"
-            inputId="export-language"
-            :options="languages"
-            optionLabel="name"
-            optionValue="id"
+          <InputText
+            v-model="language"
+            id="export-language"
             placeholder="Main names only"
-            showClear
           />
+          <p class="text-muted-color m-0">
+            Folder names are translated when the zip is built and are not saved. Leave this empty for the main names only.
+          </p>
         </div>
         <p class="m-0">{{ previewLabel }}</p>
       </div>
@@ -172,8 +171,7 @@ const onlyUnexported = ref(false);
 const importedAfter = ref(null);
 const zipFilenames = ref([]);
 const sources = ref([]);
-const languages = ref([]);
-const languageId = ref(null);
+const language = ref("");
 const previewCount = ref(null);
 const exporting = ref(false);
 let previewToken = 0;
@@ -231,7 +229,7 @@ function exportBody() {
     only_unexported: onlyUnexported.value,
     imported_after: importedAfter.value ? importedAfter.value.toISOString() : null,
     zip_filenames: zipFilenames.value || [],
-    language_id: languageId.value || null,
+    language: language.value.trim() || null,
   };
 }
 
@@ -239,12 +237,8 @@ async function openExport() {
   useSelection.value = selectedIds.value.length > 0;
   exportOpen.value = true;
   try {
-    const [src, langs] = await Promise.all([api.importSources(), api.exportLanguages()]);
+    const src = await api.importSources();
     sources.value = src.sources || [];
-    languages.value = langs.languages || [];
-    if (languageId.value && !languages.value.some((lang) => lang.id === languageId.value)) {
-      languageId.value = null;
-    }
   } catch (e) {
     error.value = e.message;
   }
@@ -277,8 +271,15 @@ async function doExport() {
     selectedDocs.value = [];
     await loadDocs();
   } catch (e) {
-    error.value = e.message;
-    toast.add({ severity: "error", summary: "Export failed", detail: e.message, life: 6000 });
+    let message = e.message;
+    try {
+      const parsed = JSON.parse(message);
+      if (parsed.detail) message = String(parsed.detail);
+    } catch {
+      /* response was not JSON */
+    }
+    error.value = message;
+    toast.add({ severity: "error", summary: "Export failed", detail: message, life: 6000 });
   } finally {
     exporting.value = false;
   }

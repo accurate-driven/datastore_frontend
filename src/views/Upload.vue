@@ -94,6 +94,7 @@
         <Column field="skipped_exact_count" header="Skipped exact" sortable style="width: 8rem" />
         <Column field="skipped_content_count" header="Same content" sortable style="width: 8rem" />
         <Column field="uncategorized_count" header="Uncategorized" sortable style="width: 8rem" />
+        <Column field="error_count" header="Errors" sortable style="width: 7rem" />
       </DataTable>
     </div>
 
@@ -108,7 +109,8 @@
         <Tag :value="detail.status" :severity="statusSeverity(detail.status)" />
         <span class="text-muted-color">
           Imported {{ detail.imported_count }} · Skipped exact {{ detail.skipped_exact_count }} · Same content
-          {{ detail.skipped_content_count }} · Uncategorized {{ detail.uncategorized_count }}
+          {{ detail.skipped_content_count }} · Uncategorized {{ detail.uncategorized_count }} · Errors
+          {{ detail.error_count }}
         </span>
       </div>
       <Message v-if="detail?.error_message" severity="error" class="mb-4" :closable="false">

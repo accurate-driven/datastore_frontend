@@ -72,11 +72,12 @@ async function req(path, opts = {}) {
 export const api = {
   health: () => req("/api/health"),
   tree: () => req("/api/categories/tree"),
-  documents: (q, tagId, fileExts) => {
+  documents: (q, tagId, fileExts, languages) => {
     const p = new URLSearchParams();
     if (q) p.set("q", q);
     if (tagId) p.set("tag_id", tagId);
     for (const ext of fileExts || []) p.append("file_exts", ext);
+    for (const code of languages || []) p.append("languages", code);
     const qs = p.toString();
     return req(qs ? `/api/documents?${qs}` : "/api/documents");
   },
@@ -98,6 +99,20 @@ export const api = {
   importJob: (id) => req(`/api/import/${id}`),
   importSources: () => req("/api/import-sources"),
   fileTypes: () => req("/api/file-types"),
+  languages: () => req("/api/languages"),
+  recheckLanguagePreview: (body) =>
+    req("/api/languages/recheck/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  recheckLanguage: (body) =>
+    req("/api/languages/recheck", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  recheckLanguageJobs: () => req("/api/languages/recheck"),
   exportLanguages: () => req("/api/export-languages"),
   addExportLanguage: (name) =>
     req("/api/export-languages", {

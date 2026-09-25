@@ -11,6 +11,7 @@ const items = [
   { label: "Upload", icon: "pi pi-upload", to: "/upload" },
   { label: "Exports", icon: "pi pi-download", to: "/exports" },
   { label: "Categories", icon: "pi pi-sitemap", to: "/categories" },
+  { label: "Utils", icon: "pi pi-wrench", to: "/utils" },
 ];
 
 function isActive(to) {

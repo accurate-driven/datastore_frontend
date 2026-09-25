@@ -20,6 +20,17 @@
             :maxSelectedLabels="2"
             class="w-full sm:w-56"
           />
+          <MultiSelect
+            v-model="docLanguages"
+            :options="languageOptions"
+            optionLabel="name"
+            optionValue="code"
+            placeholder="Languages"
+            display="chip"
+            filter
+            :maxSelectedLabels="2"
+            class="w-full sm:w-56"
+          />
           <Button label="Search" icon="pi pi-search" severity="secondary" @click="loadDocs" />
           <Button label="Export zip" icon="pi pi-download" @click="openExport" />
         </div>
@@ -83,6 +94,20 @@
             inputId="export-types"
             :options="fileTypeOptions"
             placeholder="Any file type"
+            display="chip"
+            filter
+            :maxSelectedLabels="3"
+          />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label for="export-doc-languages">Languages</label>
+          <MultiSelect
+            v-model="exportDocLanguages"
+            inputId="export-doc-languages"
+            :options="languageOptions"
+            optionLabel="name"
+            optionValue="code"
+            placeholder="Any language"
             display="chip"
             filter
             :maxSelectedLabels="3"
@@ -153,6 +178,11 @@
               </template>
             </Column>
             <Column field="filename" header="Filename" sortable />
+            <Column field="language_name" header="Language" sortable>
+              <template #body="{ data }">
+                {{ data.language_name || "—" }}
+              </template>
+            </Column>
             <Column field="category_path" header="Category" sortable>
               <template #body="{ data }">
                 {{ lastCategory(data.category_path) }}
@@ -206,6 +236,9 @@ const sources = ref([]);
 const fileExts = ref([]);
 const docFileExts = ref([]);
 const fileTypeOptions = ref([]);
+const docLanguages = ref([]);
+const exportDocLanguages = ref([]);
+const languageOptions = ref([]);
 const language = ref("");
 const previewCount = ref(null);
 const exporting = ref(false);
@@ -235,11 +268,16 @@ async function loadFileTypes() {
   fileTypeOptions.value = types.file_types || [];
 }
 
+async function loadLanguages() {
+  const data = await api.languages();
+  languageOptions.value = data.languages || [];
+}
+
 async function loadDocs() {
   error.value = "";
   loading.value = true;
   try {
-    const data = await api.documents(q.value, tagId.value, docFileExts.value);
+    const data = await api.documents(q.value, tagId.value, docFileExts.value, docLanguages.value);
     docs.value = data.documents || [];
   } catch (e) {
     error.value = e.message;
@@ -259,7 +297,8 @@ const hasExportFilter = computed(
     onlyUnexported.value ||
     !!importedAfter.value ||
     (zipFilenames.value || []).length > 0 ||
-    (fileExts.value || []).length > 0,
+    (fileExts.value || []).length > 0 ||
+    (exportDocLanguages.value || []).length > 0,
 );
 const canExport = computed(() => hasExportFilter.value && previewCount.value > 0 && !exporting.value);
 const exportPercent = computed(() =>
@@ -285,6 +324,7 @@ function exportBody() {
     imported_after: importedAfter.value ? importedAfter.value.toISOString() : null,
     zip_filenames: zipFilenames.value || [],
     file_exts: fileExts.value || [],
+    languages: exportDocLanguages.value || [],
     language: language.value.trim() || null,
   };
 }
@@ -293,9 +333,10 @@ async function openExport() {
   useSelection.value = selectedIds.value.length > 0;
   exportOpen.value = true;
   try {
-    const [src, types] = await Promise.all([api.importSources(), api.fileTypes()]);
+    const [src, types, langs] = await Promise.all([api.importSources(), api.fileTypes(), api.languages()]);
     sources.value = src.sources || [];
     fileTypeOptions.value = types.file_types || [];
+    languageOptions.value = langs.languages || [];
   } catch (e) {
     error.value = e.message;
   }
@@ -371,6 +412,7 @@ watch(
     importedAfter.value?.toISOString() || "",
     (zipFilenames.value || []).join("\n"),
     (fileExts.value || []).join("\n"),
+    (exportDocLanguages.value || []).join("\n"),
     selectedIds.value.join(","),
   ],
   refreshPreview,
@@ -381,7 +423,7 @@ watch(tagId, () => {
   loadDocs();
 });
 watch(
-  () => (docFileExts.value || []).join("\n"),
+  () => [(docFileExts.value || []).join("\n"), (docLanguages.value || []).join("\n")],
   () => {
     selectedDocs.value = [];
     loadDocs();
@@ -389,7 +431,7 @@ watch(
 );
 onMounted(async () => {
   try {
-    await Promise.all([loadTree(), loadFileTypes()]);
+    await Promise.all([loadTree(), loadFileTypes(), loadLanguages()]);
     await loadDocs();
   } catch (e) {
     error.value = e.message || "Cannot reach API. Is docker compose up on the VM?";

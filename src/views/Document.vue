@@ -5,7 +5,7 @@
         <div>
           <div class="font-semibold text-xl mb-2">{{ doc.title }}</div>
           <p class="text-muted-color m-0">
-            {{ doc.filename }} · {{ doc.page_count || "—" }} pages · {{ doc.file_ext }}
+            {{ doc.filename }} · {{ doc.page_count || "—" }} pages · {{ doc.file_ext }} · {{ doc.language_name || "—" }}
           </p>
         </div>
         <div class="flex flex-wrap gap-2">

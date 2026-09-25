@@ -1,5 +1,61 @@
 const BASE = import.meta.env.VITE_API_BASE || "";
 
+function concatBytes(left, right) {
+  const out = new Uint8Array(left.length + right.length);
+  out.set(left, 0);
+  out.set(right, left.length);
+  return out;
+}
+
+async function readExportStream(res, onProgress) {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = new Uint8Array(0);
+  let mode = "lines";
+  let filename = "export.zip";
+  let remaining = 0;
+  const zipChunks = [];
+
+  while (true) {
+    if (mode === "lines") {
+      let splitAt = pending.indexOf(10);
+      while (splitAt >= 0) {
+        const line = decoder.decode(pending.slice(0, splitAt));
+        pending = pending.slice(splitAt + 1);
+        if (line.trim()) {
+          const msg = JSON.parse(line);
+          if (msg.type === "error") throw new Error(msg.detail || "Export failed");
+          if (msg.type === "progress") onProgress?.(msg);
+          if (msg.type === "file") {
+            filename = msg.filename || filename;
+            remaining = msg.size;
+            mode = "zip";
+            break;
+          }
+        }
+        splitAt = pending.indexOf(10);
+      }
+    }
+    if (mode === "zip" && pending.length) {
+      const take = Math.min(pending.length, remaining);
+      zipChunks.push(pending.slice(0, take));
+      pending = pending.slice(take);
+      remaining -= take;
+      if (remaining === 0) {
+        return { blob: new Blob(zipChunks, { type: "application/zip" }), filename };
+      }
+    }
+    const { done, value } = await reader.read();
+    if (value) pending = concatBytes(pending, value);
+    if (done) {
+      if (mode === "zip" && remaining === 0) {
+        return { blob: new Blob(zipChunks, { type: "application/zip" }), filename };
+      }
+      throw new Error("Export ended before the zip finished");
+    }
+  }
+}
+
 async function req(path, opts = {}) {
   const res = await fetch(`${BASE}${path}`, opts);
   if (!res.ok) {
@@ -23,6 +79,7 @@ export const api = {
     return req(`/api/documents?${p}`);
   },
   document: (id) => req(`/api/documents/${id}`),
+  deleteDocument: (id) => req(`/api/documents/${id}`, { method: "DELETE" }),
   setCategory: (id, tagId) =>
     req(`/api/documents/${id}/category`, {
       method: "PATCH",
@@ -38,6 +95,7 @@ export const api = {
   importJobs: () => req("/api/import"),
   importJob: (id) => req(`/api/import/${id}`),
   importSources: () => req("/api/import-sources"),
+  fileTypes: () => req("/api/file-types"),
   exportLanguages: () => req("/api/export-languages"),
   addExportLanguage: (name) =>
     req("/api/export-languages", {
@@ -58,17 +116,15 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
-  exportZip: async (body) => {
+  exportZip: async (body, { onProgress, signal } = {}) => {
     const res = await fetch(`${BASE}/api/export`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal,
     });
     if (!res.ok) throw new Error(await res.text());
-    const blob = await res.blob();
-    const cd = res.headers.get("Content-Disposition") || "";
-    const m = cd.match(/filename="?([^"]+)/);
-    return { blob, filename: m?.[1] || "export.zip" };
+    return readExportStream(res, onProgress);
   },
   exports: () => req("/api/exports"),
   patchTag: (id, body) =>

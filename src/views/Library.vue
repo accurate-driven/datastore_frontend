@@ -22,7 +22,14 @@
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     </div>
 
-    <Dialog v-model:visible="exportOpen" header="Export zip" modal :style="{ width: '32rem' }">
+    <Dialog
+      v-model:visible="exportOpen"
+      header="Export zip"
+      modal
+      :style="{ width: '32rem' }"
+      :closable="!exporting"
+      :closeOnEscape="!exporting"
+    >
       <p class="text-muted-color mt-0">
         The zip uses the current category tree and current file names. Filters combine.
       </p>
@@ -61,6 +68,18 @@
           />
         </div>
         <div class="flex flex-col gap-2">
+          <label for="export-types">File types</label>
+          <MultiSelect
+            v-model="fileExts"
+            inputId="export-types"
+            :options="fileTypeOptions"
+            placeholder="Any file type"
+            display="chip"
+            filter
+            :maxSelectedLabels="3"
+          />
+        </div>
+        <div class="flex flex-col gap-2">
           <label for="export-language">Second language</label>
           <InputText
             v-model="language"
@@ -72,9 +91,13 @@
           </p>
         </div>
         <p class="m-0">{{ previewLabel }}</p>
+        <div v-if="exporting" class="flex flex-col gap-2">
+          <ProgressBar :value="exportPercent" :showValue="true" />
+          <p class="m-0">{{ exportStatus }}</p>
+        </div>
       </div>
       <template #footer>
-        <Button label="Cancel" severity="secondary" text @click="exportOpen = false" />
+        <Button label="Cancel" severity="secondary" text @click="cancelExport" />
         <Button label="Export" icon="pi pi-download" :disabled="!canExport" :loading="exporting" @click="doExport" />
       </template>
     </Dialog>
@@ -171,10 +194,16 @@ const onlyUnexported = ref(false);
 const importedAfter = ref(null);
 const zipFilenames = ref([]);
 const sources = ref([]);
+const fileExts = ref([]);
+const fileTypeOptions = ref([]);
 const language = ref("");
 const previewCount = ref(null);
 const exporting = ref(false);
+const exportPhase = ref("");
+const exportDone = ref(0);
+const exportTotal = ref(0);
 let previewToken = 0;
+let exportAbort = null;
 
 const treeNodes = computed(() => [
   {
@@ -214,9 +243,20 @@ const hasExportFilter = computed(
     (useSelection.value && selectedIds.value.length > 0) ||
     onlyUnexported.value ||
     !!importedAfter.value ||
-    (zipFilenames.value || []).length > 0,
+    (zipFilenames.value || []).length > 0 ||
+    (fileExts.value || []).length > 0,
 );
 const canExport = computed(() => hasExportFilter.value && previewCount.value > 0 && !exporting.value);
+const exportPercent = computed(() =>
+  exportTotal.value ? Math.round((exportDone.value / exportTotal.value) * 100) : 0,
+);
+const exportStatus = computed(() => {
+  const done = exportDone.value;
+  const total = exportTotal.value;
+  if (exportPhase.value === "translate") return `Translating folder names, ${done} of ${total}`;
+  if (exportPhase.value === "zip") return `Adding files, ${done} of ${total}`;
+  return "Starting export…";
+});
 const previewLabel = computed(() => {
   if (!hasExportFilter.value) return "Choose a selection or a filter.";
   if (previewCount.value == null) return "Counting…";
@@ -229,6 +269,7 @@ function exportBody() {
     only_unexported: onlyUnexported.value,
     imported_after: importedAfter.value ? importedAfter.value.toISOString() : null,
     zip_filenames: zipFilenames.value || [],
+    file_exts: fileExts.value || [],
     language: language.value.trim() || null,
   };
 }
@@ -237,8 +278,9 @@ async function openExport() {
   useSelection.value = selectedIds.value.length > 0;
   exportOpen.value = true;
   try {
-    const src = await api.importSources();
+    const [src, types] = await Promise.all([api.importSources(), api.fileTypes()]);
     sources.value = src.sources || [];
+    fileTypeOptions.value = types.file_types || [];
   } catch (e) {
     error.value = e.message;
   }
@@ -260,17 +302,37 @@ async function refreshPreview() {
   }
 }
 
+function cancelExport() {
+  if (exporting.value) {
+    exportAbort?.abort();
+    return;
+  }
+  exportOpen.value = false;
+}
+
 async function doExport() {
   exporting.value = true;
+  exportPhase.value = "";
+  exportDone.value = 0;
+  exportTotal.value = 0;
   error.value = "";
+  exportAbort = new AbortController();
   try {
-    const { blob, filename } = await api.exportZip(exportBody());
+    const { blob, filename } = await api.exportZip(exportBody(), {
+      signal: exportAbort.signal,
+      onProgress: (msg) => {
+        exportPhase.value = msg.phase;
+        exportDone.value = msg.done;
+        exportTotal.value = msg.total;
+      },
+    });
     downloadBlob(blob, filename);
     toast.add({ severity: "success", summary: "Export ready", detail: filename, life: 3000 });
     exportOpen.value = false;
     selectedDocs.value = [];
     await loadDocs();
   } catch (e) {
+    if (e.name === "AbortError") return;
     let message = e.message;
     try {
       const parsed = JSON.parse(message);
@@ -282,6 +344,7 @@ async function doExport() {
     toast.add({ severity: "error", summary: "Export failed", detail: message, life: 6000 });
   } finally {
     exporting.value = false;
+    exportAbort = null;
   }
 }
 
@@ -292,6 +355,7 @@ watch(
     onlyUnexported.value,
     importedAfter.value?.toISOString() || "",
     (zipFilenames.value || []).join("\n"),
+    (fileExts.value || []).join("\n"),
     selectedIds.value.join(","),
   ],
   refreshPreview,

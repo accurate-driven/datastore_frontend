@@ -8,7 +8,10 @@
             {{ doc.filename }} · {{ doc.page_count || "—" }} pages · {{ doc.file_ext }}
           </p>
         </div>
-        <Button as="a" :href="api.downloadUrl(doc.id)" label="Download" icon="pi pi-download" />
+        <div class="flex flex-wrap gap-2">
+          <Button as="a" :href="api.downloadUrl(doc.id)" label="Download" icon="pi pi-download" />
+          <Button label="Remove" icon="pi pi-trash" severity="danger" @click="remove" />
+        </div>
       </div>
     </div>
 
@@ -44,7 +47,7 @@
           <p v-else class="text-muted-color m-0">None</p>
           <div class="font-semibold text-xl mt-6 mb-4">Original zip paths</div>
           <ul v-if="paths.length" class="list-none p-0 m-0 flex flex-col gap-2">
-            <li v-for="a in paths" :key="a" class="text-muted-color">{{ a }}</li>
+            <li v-for="a in paths" :key="a" class="text-muted-color break-all">{{ a }}</li>
           </ul>
           <p v-else class="text-muted-color m-0">None</p>
         </div>
@@ -71,12 +74,15 @@
 import { api } from "@/api";
 import { flattenTags } from "@/categoryTree";
 import { fmtDate, sourceSeverity } from "@/format";
+import { useConfirm } from "primevue/useconfirm";
 import { useToast } from "primevue/usetoast";
 import { computed, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const route = useRoute();
+const router = useRouter();
 const toast = useToast();
+const confirm = useConfirm();
 const doc = ref(null);
 const tree = ref([]);
 const tagId = ref(null);
@@ -124,6 +130,27 @@ async function reclass() {
     error.value = e.message;
     toast.add({ severity: "error", summary: "Reclassify failed", detail: e.message, life: 6000 });
   }
+}
+
+function remove() {
+  const title = doc.value?.title || "this document";
+  confirm.require({
+    header: "Remove document",
+    message: `Remove "${title}" from the library? This cannot be undone.`,
+    icon: "pi pi-exclamation-triangle",
+    acceptClass: "p-button-danger",
+    accept: async () => {
+      error.value = "";
+      try {
+        await api.deleteDocument(doc.value.id);
+        toast.add({ severity: "success", summary: "Removed", life: 3000 });
+        router.push({ name: "library" });
+      } catch (e) {
+        error.value = e.message;
+        toast.add({ severity: "error", summary: "Remove failed", detail: e.message, life: 6000 });
+      }
+    },
+  });
 }
 
 watch(() => route.params.id, load, { immediate: true });

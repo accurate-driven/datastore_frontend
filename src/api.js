@@ -72,11 +72,13 @@ async function req(path, opts = {}) {
 export const api = {
   health: () => req("/api/health"),
   tree: () => req("/api/categories/tree"),
-  documents: (q, tagId) => {
+  documents: (q, tagId, fileExts) => {
     const p = new URLSearchParams();
     if (q) p.set("q", q);
     if (tagId) p.set("tag_id", tagId);
-    return req(`/api/documents?${p}`);
+    for (const ext of fileExts || []) p.append("file_exts", ext);
+    const qs = p.toString();
+    return req(qs ? `/api/documents?${qs}` : "/api/documents");
   },
   document: (id) => req(`/api/documents/${id}`),
   deleteDocument: (id) => req(`/api/documents/${id}`, { method: "DELETE" }),

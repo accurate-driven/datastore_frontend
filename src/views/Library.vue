@@ -11,6 +11,15 @@
             <InputIcon class="pi pi-search" />
             <InputText v-model="q" placeholder="Search title, filename, or path" @keyup.enter="loadDocs" />
           </IconField>
+          <MultiSelect
+            v-model="docFileExts"
+            :options="fileTypeOptions"
+            placeholder="File types"
+            display="chip"
+            filter
+            :maxSelectedLabels="2"
+            class="w-full sm:w-56"
+          />
           <Button label="Search" icon="pi pi-search" severity="secondary" @click="loadDocs" />
           <Button label="Export zip" icon="pi pi-download" @click="openExport" />
         </div>
@@ -195,6 +204,7 @@ const importedAfter = ref(null);
 const zipFilenames = ref([]);
 const sources = ref([]);
 const fileExts = ref([]);
+const docFileExts = ref([]);
 const fileTypeOptions = ref([]);
 const language = ref("");
 const previewCount = ref(null);
@@ -220,11 +230,16 @@ async function loadTree() {
   expandedKeys.value = { all: true };
 }
 
+async function loadFileTypes() {
+  const types = await api.fileTypes();
+  fileTypeOptions.value = types.file_types || [];
+}
+
 async function loadDocs() {
   error.value = "";
   loading.value = true;
   try {
-    const data = await api.documents(q.value, tagId.value);
+    const data = await api.documents(q.value, tagId.value, docFileExts.value);
     docs.value = data.documents || [];
   } catch (e) {
     error.value = e.message;
@@ -361,10 +376,20 @@ watch(
   refreshPreview,
 );
 
-watch(tagId, loadDocs);
+watch(tagId, () => {
+  selectedDocs.value = [];
+  loadDocs();
+});
+watch(
+  () => (docFileExts.value || []).join("\n"),
+  () => {
+    selectedDocs.value = [];
+    loadDocs();
+  },
+);
 onMounted(async () => {
   try {
-    await loadTree();
+    await Promise.all([loadTree(), loadFileTypes()]);
     await loadDocs();
   } catch (e) {
     error.value = e.message || "Cannot reach API. Is docker compose up on the VM?";

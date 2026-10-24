@@ -124,6 +124,16 @@
             Folder names are translated when the zip is built and are not saved. Leave this empty for the main names only.
           </p>
         </div>
+        <div v-if="language.trim()" class="flex flex-col gap-2">
+          <span>Translate depths</span>
+          <div class="flex flex-wrap gap-4">
+            <div v-for="depth in translateDepthOptions" :key="depth" class="flex items-center gap-2">
+              <Checkbox v-model="translateDepths" :inputId="`export-depth-${depth}`" :value="depth" />
+              <label :for="`export-depth-${depth}`">{{ depth }}</label>
+            </div>
+          </div>
+          <p class="text-muted-color m-0">1 is the top folder. Unchecked depths keep the main folder name.</p>
+        </div>
         <p class="m-0">{{ previewLabel }}</p>
         <div v-if="exporting" class="flex flex-col gap-2">
           <ProgressBar :value="exportPercent" :showValue="true" />
@@ -240,6 +250,8 @@ const docLanguages = ref([]);
 const exportDocLanguages = ref([]);
 const languageOptions = ref([]);
 const language = ref("");
+const translateDepthOptions = [1, 2, 3];
+const translateDepths = ref([1, 2, 3]);
 const previewCount = ref(null);
 const exporting = ref(false);
 const exportPhase = ref("");
@@ -326,6 +338,7 @@ function exportBody() {
     file_exts: fileExts.value || [],
     languages: exportDocLanguages.value || [],
     language: language.value.trim() || null,
+    translate_depths: language.value.trim() ? translateDepths.value : [],
   };
 }
 

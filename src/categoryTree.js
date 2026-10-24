@@ -2,7 +2,7 @@ export function toPrimeTree(nodes) {
   return (nodes || []).map((n) => ({
     key: n.id,
     label: `${n.name} (${n.document_count ?? 0})`,
-    icon: n.name === "Uncategorized" ? "pi pi-inbox" : "pi pi-folder",
+    icon: n.name === "Uncategorized" || n.name === "Not for the library" ? "pi pi-inbox" : "pi pi-folder",
     data: n,
     children: n.children?.length ? toPrimeTree(n.children) : undefined,
   }));

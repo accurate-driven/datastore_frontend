@@ -158,4 +158,5 @@ export const api = {
     }),
   reclassifyUncat: () => req("/api/categories/reclassify-uncategorized", { method: "POST" }),
   downloadUrl: (id) => `${BASE}/api/documents/${id}/download`,
+  viewUrl: (id) => `${BASE}/api/documents/${id}/download?inline=1`,
 };

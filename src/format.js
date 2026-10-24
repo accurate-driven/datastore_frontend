@@ -21,7 +21,7 @@ export function downloadBlob(blob, filename) {
 export function outcomeSeverity(outcome) {
   if (outcome === "imported" || outcome === "ingested" || outcome === "updated") return "success";
   if (outcome === "error") return "danger";
-  if (outcome === "unchanged" || String(outcome || "").startsWith("skipped")) return "secondary";
+  if (outcome === "excluded" || outcome === "unchanged" || String(outcome || "").startsWith("skipped")) return "secondary";
   if (outcome === "too_short") return "warn";
   return "warn";
 }

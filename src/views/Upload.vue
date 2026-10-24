@@ -103,7 +103,7 @@
       modal
       class="upload-detail-dialog"
       :header="detail?.zip_filename || 'Upload'"
-      :style="{ width: 'min(72rem, 96vw)' }"
+      :style="{ width: 'min(120rem, 98vw)' }"
     >
       <div v-if="detail" class="flex flex-wrap items-center gap-3 mb-4">
         <Tag :value="detail.status" :severity="statusSeverity(detail.status)" />
@@ -126,9 +126,19 @@
         scrollable
         emptyMessage="No files yet."
       >
-        <Column field="zip_path" header="Original zip path (not category)" />
-        <Column field="original_filename" header="Filename" />
-        <Column field="outcome" header="Result" style="width: 10rem">
+        <Column header="Original zip path (not category)">
+          <template #body="{ data }">
+            <span class="cell-clip" :title="pathInsideZip(detail.zip_filename, data.zip_path)">
+              {{ pathInsideZip(detail.zip_filename, data.zip_path) }}
+            </span>
+          </template>
+        </Column>
+        <Column header="Filename">
+          <template #body="{ data }">
+            <span class="cell-clip" :title="data.original_filename">{{ data.original_filename }}</span>
+          </template>
+        </Column>
+        <Column field="outcome" header="Result" style="width: 8rem">
           <template #body="{ data }">
             <Tag :value="data.outcome" :severity="outcomeSeverity(data.outcome)" />
           </template>
@@ -138,11 +148,12 @@
             <router-link
               v-if="data.document_id"
               :to="`/documents/${data.document_id}`"
-              class="text-primary font-medium hover:underline"
+              class="cell-clip text-primary font-medium hover:underline"
+              :title="data.category_path"
             >
               {{ lastCategory(data.category_path) }}
             </router-link>
-            <span v-else>{{ data.category_path ? lastCategory(data.category_path) : data.detail || "—" }}</span>
+            <span v-else class="cell-clip" :title="data.detail || ''">{{ data.detail || "—" }}</span>
           </template>
         </Column>
       </DataTable>
@@ -186,6 +197,18 @@ function sleep(ms) {
 
 function stillActive(status) {
   return status === "queued" || status === "running";
+}
+
+function pathInsideZip(zipFilename, path) {
+  const file = String(zipFilename || "").split(/[/\\]/).pop() || "";
+  const stem = file.replace(/\.zip$/i, "");
+  let value = String(path || "").replace(/\\/g, "/");
+  for (const prefix of [file, stem]) {
+    if (prefix && (value === prefix || value.startsWith(`${prefix}/`))) {
+      value = value.slice(prefix.length).replace(/^\//, "");
+    }
+  }
+  return value || "—";
 }
 
 function statusSeverity(status) {
@@ -320,7 +343,8 @@ onUnmounted(() => {
 
 <style>
 .upload-detail-dialog {
-  max-width: 96vw;
+  width: min(120rem, 98vw);
+  max-width: 98vw;
   overflow: hidden;
 }
 
@@ -334,12 +358,14 @@ onUnmounted(() => {
 }
 
 .upload-detail-dialog .p-datatable-table {
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  table-layout: fixed;
 }
 
-.upload-detail-dialog .p-datatable-thead > tr > th,
-.upload-detail-dialog .p-datatable-tbody > tr > td {
+.upload-detail-dialog .cell-clip {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 </style>

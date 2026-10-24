@@ -9,10 +9,30 @@
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
+          <Button
+            v-if="isPdf"
+            as="a"
+            :href="api.viewUrl(doc.id)"
+            target="_blank"
+            rel="noopener"
+            label="Open"
+            icon="pi pi-external-link"
+            severity="secondary"
+          />
           <Button as="a" :href="api.downloadUrl(doc.id)" label="Download" icon="pi pi-download" />
           <Button label="Remove" icon="pi pi-trash" severity="danger" @click="remove" />
         </div>
       </div>
+    </div>
+
+    <div v-if="isPdf" class="card">
+      <div class="font-semibold text-xl mb-4">Preview</div>
+      <iframe
+        class="w-full rounded-border"
+        style="height: 75vh; border: 1px solid var(--p-content-border-color)"
+        :src="api.viewUrl(doc.id)"
+        :title="doc.filename"
+      />
     </div>
 
     <div class="card">
@@ -89,6 +109,7 @@ const tagId = ref(null);
 const error = ref("");
 
 const flat = computed(() => flattenTags(tree.value));
+const isPdf = computed(() => (doc.value?.file_ext || "").toLowerCase() === "pdf");
 const filenames = computed(() =>
   (doc.value?.aliases || []).filter((a) => a.kind === "filename").map((a) => a.value),
 );

@@ -3,14 +3,14 @@
     <div class="card">
       <div class="font-semibold text-xl mb-2">Upload</div>
       <p class="text-muted-color mb-4">
-        Drop zip files here. Folders inside are stored as original paths, not categories. Extra files wait in
+        Drop zip or rar files here. Folders inside are stored as original paths, not categories. Extra files wait in
         the queue until the current import finishes.
       </p>
       <div @click="onZoneClick">
         <FileUpload
           ref="uploader"
           name="file"
-          accept=".zip,application/zip,application/x-zip-compressed"
+          accept=".zip,.rar,application/zip,application/x-zip-compressed,application/vnd.rar,application/x-rar-compressed"
           :maxFileSize="3221225472"
           :customUpload="true"
           :auto="true"
@@ -32,7 +32,7 @@
               @keydown.space.prevent="openPicker"
             >
               <i class="pi pi-cloud-upload text-4xl text-muted-color mb-3" />
-              <span class="text-muted-color">Drag zip files here, or click to choose.</span>
+              <span class="text-muted-color">Drag zip or rar files here, or click to choose.</span>
             </div>
           </template>
         </FileUpload>
@@ -66,7 +66,7 @@
 
     <div class="card">
       <div class="font-semibold text-xl mb-2">Upload log</div>
-      <p class="text-muted-color mb-4">Click a row to see the files in that zip.</p>
+      <p class="text-muted-color mb-4">Click a row to see the files in that archive.</p>
       <DataTable
         :value="jobs"
         dataKey="id"
@@ -84,7 +84,7 @@
         <Column field="started_at" header="When" sortable style="width: 11rem">
           <template #body="{ data }">{{ fmtDate(data.started_at) }}</template>
         </Column>
-        <Column field="zip_filename" header="Zip" sortable />
+        <Column field="zip_filename" header="Archive" sortable />
         <Column field="status" header="Status" sortable style="width: 8rem">
           <template #body="{ data }">
             <Tag :value="data.status" :severity="statusSeverity(data.status)" />
@@ -126,7 +126,7 @@
         scrollable
         emptyMessage="No files yet."
       >
-        <Column header="Original zip path (not category)">
+        <Column header="Original path (not category)">
           <template #body="{ data }">
             <span class="cell-clip" :title="pathInsideZip(detail.zip_filename, data.zip_path)">
               {{ pathInsideZip(detail.zip_filename, data.zip_path) }}
@@ -201,7 +201,7 @@ function stillActive(status) {
 
 function pathInsideZip(zipFilename, path) {
   const file = String(zipFilename || "").split(/[/\\]/).pop() || "";
-  const stem = file.replace(/\.zip$/i, "");
+  const stem = file.replace(/\.(zip|rar)$/i, "");
   let value = String(path || "").replace(/\\/g, "/");
   for (const prefix of [file, stem]) {
     if (prefix && (value === prefix || value.startsWith(`${prefix}/`))) {

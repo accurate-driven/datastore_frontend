@@ -60,12 +60,12 @@
     <div class="grid grid-cols-12 gap-4">
       <div class="col-span-12 md:col-span-6">
         <div class="card">
-          <div class="font-semibold text-xl mb-4">Original names (zip, not category)</div>
+          <div class="font-semibold text-xl mb-4">Original names (archive, not category)</div>
           <ul v-if="filenames.length" class="list-none p-0 m-0 flex flex-col gap-2">
             <li v-for="a in filenames" :key="a" class="text-muted-color">{{ a }}</li>
           </ul>
           <p v-else class="text-muted-color m-0">None</p>
-          <div class="font-semibold text-xl mt-6 mb-4">Original zip paths</div>
+          <div class="font-semibold text-xl mt-6 mb-4">Original archive paths</div>
           <ul v-if="paths.length" class="list-none p-0 m-0 flex flex-col gap-2">
             <li v-for="a in paths" :key="a" class="text-muted-color break-all">{{ a }}</li>
           </ul>

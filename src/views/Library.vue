@@ -168,6 +168,7 @@
       <div class="col-span-12 lg:col-span-8 xl:col-span-9">
         <div class="card">
           <DataTable
+            class="library-table"
             :value="docs"
             v-model:selection="selectedDocs"
             dataKey="id"
@@ -176,34 +177,42 @@
             :rows="20"
             :rowsPerPageOptions="[10, 20, 50]"
             stripedRows
-            responsiveLayout="scroll"
+            :tableStyle="{ width: '100%', tableLayout: 'fixed' }"
             emptyMessage="No papers in this category."
           >
-            <Column selectionMode="multiple" headerStyle="width: 3rem" />
+            <Column selectionMode="multiple" style="width: 3.5rem" />
             <Column field="title" header="Title" sortable>
               <template #body="{ data }">
-                <router-link :to="`/documents/${data.id}`" class="text-primary font-medium hover:underline">
+                <router-link
+                  :to="`/documents/${data.id}`"
+                  class="cell-text text-primary font-medium hover:underline"
+                  :title="data.title"
+                >
                   {{ data.title }}
                 </router-link>
               </template>
             </Column>
-            <Column field="filename" header="Filename" sortable />
-            <Column field="language_name" header="Language" sortable>
+            <Column field="filename" header="Filename" sortable>
+              <template #body="{ data }">
+                <span class="cell-text" :title="data.filename">{{ data.filename }}</span>
+              </template>
+            </Column>
+            <Column field="language_name" header="Language" sortable style="width: 8rem">
               <template #body="{ data }">
                 {{ data.language_name || "—" }}
               </template>
             </Column>
-            <Column field="category_path" header="Category" sortable>
+            <Column field="category_path" header="Category" sortable style="width: 12rem">
               <template #body="{ data }">
                 {{ lastCategory(data.category_path) }}
               </template>
             </Column>
-            <Column field="source" header="Source" style="width: 8rem">
+            <Column field="source" header="Source" style="width: 6.5rem">
               <template #body="{ data }">
                 <Tag :value="data.source || '—'" :severity="sourceSeverity(data.source)" />
               </template>
             </Column>
-            <Column field="last_exported_at" header="Last exported" sortable>
+            <Column field="last_exported_at" header="Last exported" sortable style="width: 11rem">
               <template #body="{ data }">
                 {{ fmtDate(data.last_exported_at) }}
               </template>
@@ -451,3 +460,27 @@ onMounted(async () => {
   }
 });
 </script>
+
+<style scoped>
+.library-table :deep(.p-datatable-table-container) {
+  overflow-x: auto;
+}
+
+.library-table :deep(.p-datatable-table) {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 72rem;
+}
+
+.library-table :deep(.p-datatable-thead > tr > th),
+.library-table :deep(.p-datatable-tbody > tr > td) {
+  overflow-wrap: break-word;
+  vertical-align: top;
+}
+
+.cell-text {
+  display: block;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+</style>

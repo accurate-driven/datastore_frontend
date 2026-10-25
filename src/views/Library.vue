@@ -114,6 +114,21 @@
           />
         </div>
         <div class="flex flex-col gap-2">
+          <label for="export-categories">Categories</label>
+          <MultiSelect
+            v-model="exportTagIds"
+            inputId="export-categories"
+            :options="rootCategories"
+            optionLabel="label"
+            optionValue="id"
+            placeholder="Any category"
+            display="chip"
+            filter
+            :maxSelectedLabels="3"
+          />
+          <p class="text-muted-color m-0">Top folders only. Papers filed under them are included.</p>
+        </div>
+        <div class="flex flex-col gap-2">
           <label for="export-language">Second language</label>
           <InputText
             v-model="language"
@@ -257,6 +272,7 @@ const docFileExts = ref([]);
 const fileTypeOptions = ref([]);
 const docLanguages = ref([]);
 const exportDocLanguages = ref([]);
+const exportTagIds = ref([]);
 const languageOptions = ref([]);
 const language = ref("");
 const translateDepthOptions = [1, 2, 3];
@@ -277,6 +293,12 @@ const treeNodes = computed(() => [
     children: toPrimeTree(tree.value),
   },
 ]);
+const rootCategories = computed(() =>
+  (tree.value || []).map((node) => ({
+    id: node.id,
+    label: `${node.name} (${node.document_count ?? 0})`,
+  })),
+);
 
 async function loadTree() {
   const data = await api.tree();
@@ -319,7 +341,8 @@ const hasExportFilter = computed(
     !!importedAfter.value ||
     (zipFilenames.value || []).length > 0 ||
     (fileExts.value || []).length > 0 ||
-    (exportDocLanguages.value || []).length > 0,
+    (exportDocLanguages.value || []).length > 0 ||
+    (exportTagIds.value || []).length > 0,
 );
 const canExport = computed(() => hasExportFilter.value && previewCount.value > 0 && !exporting.value);
 const exportPercent = computed(() =>
@@ -346,6 +369,7 @@ function exportBody() {
     zip_filenames: zipFilenames.value || [],
     file_exts: fileExts.value || [],
     languages: exportDocLanguages.value || [],
+    tag_ids: exportTagIds.value || [],
     language: language.value.trim() || null,
     translate_depths: language.value.trim() ? translateDepths.value : [],
   };
@@ -355,10 +379,16 @@ async function openExport() {
   useSelection.value = selectedIds.value.length > 0;
   exportOpen.value = true;
   try {
-    const [src, types, langs] = await Promise.all([api.importSources(), api.fileTypes(), api.languages()]);
+    const [src, types, langs, categoryTree] = await Promise.all([
+      api.importSources(),
+      api.fileTypes(),
+      api.languages(),
+      api.tree(),
+    ]);
     sources.value = src.sources || [];
     fileTypeOptions.value = types.file_types || [];
     languageOptions.value = langs.languages || [];
+    tree.value = categoryTree.tree || [];
   } catch (e) {
     error.value = e.message;
   }
@@ -435,6 +465,7 @@ watch(
     (zipFilenames.value || []).join("\n"),
     (fileExts.value || []).join("\n"),
     (exportDocLanguages.value || []).join("\n"),
+    (exportTagIds.value || []).join("\n"),
     selectedIds.value.join(","),
   ],
   refreshPreview,

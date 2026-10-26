@@ -31,6 +31,15 @@
             :maxSelectedLabels="2"
             class="w-full sm:w-56"
           />
+          <MultiSelect
+            v-model="docZipFilenames"
+            :options="sources"
+            placeholder="Upload source"
+            display="chip"
+            filter
+            :maxSelectedLabels="2"
+            class="w-full sm:w-56"
+          />
           <Button label="Search" icon="pi pi-search" severity="secondary" @click="loadDocs" />
           <Button label="Export zip" icon="pi pi-download" @click="openExport" />
         </div>
@@ -271,8 +280,10 @@ const fileExts = ref([]);
 const docFileExts = ref([]);
 const fileTypeOptions = ref([]);
 const docLanguages = ref([]);
+const docZipFilenames = ref([]);
 const exportDocLanguages = ref([]);
 const exportTagIds = ref([]);
+const exportTree = ref([]);
 const languageOptions = ref([]);
 const language = ref("");
 const translateDepthOptions = [1, 2, 3];
@@ -294,16 +305,28 @@ const treeNodes = computed(() => [
   },
 ]);
 const rootCategories = computed(() =>
-  (tree.value || []).map((node) => ({
+  (exportTree.value || []).map((node) => ({
     id: node.id,
     label: `${node.name} (${node.document_count ?? 0})`,
   })),
 );
 
+function treeContains(nodes, id) {
+  for (const node of nodes || []) {
+    if (node.id === id) return true;
+    if (treeContains(node.children, id)) return true;
+  }
+  return false;
+}
+
 async function loadTree() {
-  const data = await api.tree();
+  const data = await api.tree(docFileExts.value, docLanguages.value, docZipFilenames.value);
   tree.value = data.tree || [];
   expandedKeys.value = { all: true };
+  if (tagId.value && !treeContains(tree.value, tagId.value)) {
+    selectionKeys.value = { all: true };
+    tagId.value = null;
+  }
 }
 
 async function loadFileTypes() {
@@ -316,11 +339,22 @@ async function loadLanguages() {
   languageOptions.value = data.languages || [];
 }
 
+async function loadSources() {
+  const data = await api.importSources();
+  sources.value = data.sources || [];
+}
+
 async function loadDocs() {
   error.value = "";
   loading.value = true;
   try {
-    const data = await api.documents(q.value, tagId.value, docFileExts.value, docLanguages.value);
+    const data = await api.documents(
+      q.value,
+      tagId.value,
+      docFileExts.value,
+      docLanguages.value,
+      docZipFilenames.value,
+    );
     docs.value = data.documents || [];
   } catch (e) {
     error.value = e.message;
@@ -388,7 +422,7 @@ async function openExport() {
     sources.value = src.sources || [];
     fileTypeOptions.value = types.file_types || [];
     languageOptions.value = langs.languages || [];
-    tree.value = categoryTree.tree || [];
+    exportTree.value = categoryTree.tree || [];
   } catch (e) {
     error.value = e.message;
   }
@@ -476,15 +510,21 @@ watch(tagId, () => {
   loadDocs();
 });
 watch(
-  () => [(docFileExts.value || []).join("\n"), (docLanguages.value || []).join("\n")],
-  () => {
+  () => [
+    (docFileExts.value || []).join("\n"),
+    (docLanguages.value || []).join("\n"),
+    (docZipFilenames.value || []).join("\n"),
+  ],
+  async () => {
     selectedDocs.value = [];
-    loadDocs();
+    const selected = tagId.value;
+    await loadTree();
+    if (tagId.value === selected) loadDocs();
   },
 );
 onMounted(async () => {
   try {
-    await Promise.all([loadTree(), loadFileTypes(), loadLanguages()]);
+    await Promise.all([loadTree(), loadFileTypes(), loadLanguages(), loadSources()]);
     await loadDocs();
   } catch (e) {
     error.value = e.message || "Cannot reach API. Is docker compose up on the VM?";

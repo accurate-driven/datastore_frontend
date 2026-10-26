@@ -71,13 +71,21 @@ async function req(path, opts = {}) {
 
 export const api = {
   health: () => req("/api/health"),
-  tree: () => req("/api/categories/tree"),
-  documents: (q, tagId, fileExts, languages) => {
+  tree: (fileExts, languages, zipFilenames) => {
+    const p = new URLSearchParams();
+    for (const ext of fileExts || []) p.append("file_exts", ext);
+    for (const code of languages || []) p.append("languages", code);
+    for (const name of zipFilenames || []) p.append("zip_filenames", name);
+    const qs = p.toString();
+    return req(qs ? `/api/categories/tree?${qs}` : "/api/categories/tree");
+  },
+  documents: (q, tagId, fileExts, languages, zipFilenames) => {
     const p = new URLSearchParams();
     if (q) p.set("q", q);
     if (tagId) p.set("tag_id", tagId);
     for (const ext of fileExts || []) p.append("file_exts", ext);
     for (const code of languages || []) p.append("languages", code);
+    for (const name of zipFilenames || []) p.append("zip_filenames", name);
     const qs = p.toString();
     return req(qs ? `/api/documents?${qs}` : "/api/documents");
   },
